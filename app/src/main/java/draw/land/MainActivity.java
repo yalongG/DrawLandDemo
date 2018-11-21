@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.os.Vibrator;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,6 +19,9 @@ import com.mapbox.mapboxsdk.annotations.PolygonOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
+import com.mapbox.mapboxsdk.style.functions.Function;
+import com.mapbox.mapboxsdk.style.functions.stops.CategoricalStops;
+import com.mapbox.mapboxsdk.style.functions.stops.Stop;
 import com.mapbox.mapboxsdk.style.layers.LineLayer;
 import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
 import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
@@ -100,7 +104,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                         clickIndex = judgeClickPosition(point);
                         if (clickIndex != -1) {
-                            drawLand();
+                            removePoint();
+                            drawPoint();
+                            deletePoint();
                         }
                     });
 
@@ -139,6 +145,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         findViewById(R.id.btn_add).setOnClickListener(this);
         findViewById(R.id.btn_cancel).setOnClickListener(this);
+    }
+
+    /**
+     * 删除点
+     */
+    private void deletePoint() {
+        new AlertDialog.Builder(this).setMessage("是否要删除这个点")
+                .setPositiveButton("确定", (dialog, which) -> {
+                    if (isClose) {
+                        if (latLngList.size() == 4) {
+                            isClose = false;
+                            if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
+                                latLngList.remove(latLngList.size() - 1);
+                                latLngList.remove(0);
+                            } else {
+                                latLngList.remove(latLngList.size() - 1);
+                                latLngList.remove(clickIndex);
+                            }
+                        } else {
+                            if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
+                                latLngList.remove(latLngList.size() - 1);
+                                latLngList.remove(0);
+                                latLngList.add(latLngList.get(0));
+                            } else {
+                                latLngList.remove(clickIndex);
+                            }
+                        }
+                    } else {
+                        latLngList.remove(clickIndex);
+                    }
+                    clickIndex = -1;
+                    drawLand();
+                })
+                .setNegativeButton("取消", (dialog, which) -> {
+                    clickIndex = -1;
+                    removePoint();
+                    drawPoint();
+                }).show();
     }
 
     /**
@@ -324,8 +368,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * 移除所有的资源
      */
     private void removeLayer() {
-        landMap.removeLayer(POINT_LAYER);
-        landMap.removeSource(POINT_SOURCE);
+        removePoint();
         landMap.removeLayer(LINE_LAYER);
         landMap.removeSource(LINE_SOURCE);
         landMap.removeLayer(TEXT_LAYER);
@@ -334,6 +377,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (polygon != null) {
             landMap.removePolygon(polygon);
         }
+    }
+
+    private void removePoint() {
+        landMap.removeLayer(POINT_LAYER);
+        landMap.removeSource(POINT_SOURCE);
     }
 
     /**
@@ -353,13 +401,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         landMap.addSource(pointSource);
         SymbolLayer pointLayer = new SymbolLayer(POINT_LAYER, POINT_SOURCE);
         if (isIntersect) {
-            pointLayer.setProperties(
-                    PropertyFactory.iconImage("error")
-            );
+            if (clickIndex != -1) {
+                pointLayer.setProperties(
+                        PropertyFactory.iconImage(Function.property("position",
+                                CategoricalStops.categorical(
+                                        Stop.stop(String.valueOf(clickIndex),
+                                                PropertyFactory.iconImage("click"))
+                                )).withDefaultValue(PropertyFactory.iconImage("error")))
+                );
+            } else {
+                pointLayer.setProperties(
+                        PropertyFactory.iconImage("error")
+                );
+            }
         } else {
-            pointLayer.setProperties(
-                    PropertyFactory.iconImage("normal")
-            );
+            if (clickIndex != -1) {
+                pointLayer.setProperties(
+                        PropertyFactory.iconImage(Function.property("position",
+                                CategoricalStops.categorical(
+                                        Stop.stop(String.valueOf(clickIndex),
+                                                PropertyFactory.iconImage("click"))
+                                )).withDefaultValue(PropertyFactory.iconImage("normal")))
+                );
+            } else {
+                pointLayer.setProperties(
+                        PropertyFactory.iconImage("normal")
+                );
+            }
         }
         landMap.addLayer(pointLayer);
     }
