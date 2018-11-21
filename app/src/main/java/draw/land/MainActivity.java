@@ -10,6 +10,7 @@ import android.view.View;
 import com.google.gson.JsonObject;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.Polygon;
+import com.mapbox.mapboxsdk.annotations.PolygonOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
@@ -25,6 +26,8 @@ import com.mapbox.services.commons.models.Position;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import draw.land.util.DistanceUtil;
 
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_CAP_ROUND;
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_JOIN_ROUND;
@@ -172,7 +175,33 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     private void drawText() {
-
+        if (latLngList.size() <= 1) {
+            return;
+        }
+        List<LatLng> centerLatLng = new ArrayList<>();
+        for (int i = 0, j = latLngList.size() - 1; i < j; i++) {
+            LatLng latLng = new LatLng();
+            latLng.setLatitude((latLngList.get(i).getLatitude() + latLngList.get(i + 1).getLatitude()) / 2);
+            latLng.setLongitude((latLngList.get(i).getLongitude() + latLngList.get(i + 1).getLongitude()) / 2);
+            centerLatLng.add(latLng);
+        }
+        List<Feature> featureList = new ArrayList<>();
+        List<Double> distanceList = DistanceUtil.getDistances(latLngList);
+        for (int i = 0, j = centerLatLng.size(); i < j; i++) {
+            JsonObject object = new JsonObject();
+            object.addProperty("distance", distanceList.get(i));
+            featureList.add(Feature.fromGeometry(Point.fromCoordinates(Position.fromCoordinates(
+                    centerLatLng.get(i).getLongitude(), centerLatLng.get(i).getLatitude())), object));
+        }
+        GeoJsonSource textSource = new GeoJsonSource(TEXT_SOURCE, FeatureCollection.fromFeatures(featureList));
+        landMap.addSource(textSource);
+        SymbolLayer textLayer = new SymbolLayer(TEXT_LAYER, TEXT_SOURCE);
+        textLayer.setProperties(
+                PropertyFactory.textField("{distance}" + "m"),
+                PropertyFactory.textSize(12f),
+                PropertyFactory.textColor(Color.parseColor("#ffffff"))
+        );
+        landMap.addLayer(textLayer);
     }
 
     /**
@@ -240,6 +269,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * 画面
      */
     private void drawPolygon() {
-
+        if (!isClose) {
+            return;
+        }
+        polygon = landMap.addPolygon(new PolygonOptions().addAll(latLngList)
+                .fillColor(Color.parseColor("#212121")).alpha(0.3f));
     }
 }
