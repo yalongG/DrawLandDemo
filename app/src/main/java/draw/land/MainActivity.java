@@ -3,6 +3,7 @@ package draw.land;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -28,6 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import draw.land.util.DistanceUtil;
+import draw.land.util.DoubleUtil;
+import draw.land.util.LineUtil;
 
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_CAP_ROUND;
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_JOIN_ROUND;
@@ -157,8 +160,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LatLng latLng = new LatLng();
         latLng.setLatitude(cameraPosition.target.getLatitude());
         latLng.setLongitude(cameraPosition.target.getLongitude());
+        if (latLngList.size() >= 3) {
+            PointF pointF = landMap.getProjection().toScreenLocation(latLng);
+            List<Feature> features = landMap.queryRenderedFeatures(pointF, POINT_LAYER);
+            if (!features.isEmpty()) {
+                int position = Integer.parseInt(features.get(0).getStringProperty("position"));
+                if (position == 0) {
+                    latLng = latLngList.get(0);
+                    isClose = true;
+                }
+            }
+        }
         latLngList.add(latLng);
-
+        isIntersect = LineUtil.isLineIntersect(latLngList, isClose);
         drawLand();
     }
 
@@ -189,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         List<Double> distanceList = DistanceUtil.getDistances(latLngList);
         for (int i = 0, j = centerLatLng.size(); i < j; i++) {
             JsonObject object = new JsonObject();
-            object.addProperty("distance", distanceList.get(i));
+            object.addProperty("distance", DoubleUtil.pointTwo(distanceList.get(i)));
             featureList.add(Feature.fromGeometry(Point.fromCoordinates(Position.fromCoordinates(
                     centerLatLng.get(i).getLongitude(), centerLatLng.get(i).getLatitude())), object));
         }
@@ -236,9 +250,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         GeoJsonSource pointSource = new GeoJsonSource(POINT_SOURCE, FeatureCollection.fromFeatures(features));
         landMap.addSource(pointSource);
         SymbolLayer pointLayer = new SymbolLayer(POINT_LAYER, POINT_SOURCE);
-        pointLayer.setProperties(
-                PropertyFactory.iconImage("normal")
-        );
+        if (isIntersect) {
+            pointLayer.setProperties(
+                    PropertyFactory.iconImage("error")
+            );
+        } else {
+            pointLayer.setProperties(
+                    PropertyFactory.iconImage("normal")
+            );
+        }
         landMap.addLayer(pointLayer);
     }
 
@@ -255,13 +275,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 FeatureCollection.fromFeatures(new Feature[]{Feature.fromGeometry(lineString)}));
         landMap.addSource(lineSource);
         LineLayer lineLayer = new LineLayer(LINE_LAYER, LINE_SOURCE);
-        lineLayer.setProperties(
-                PropertyFactory.lineDasharray(new Float[]{1f, 2f}),
-                PropertyFactory.lineCap(LINE_CAP_ROUND),
-                PropertyFactory.lineJoin(LINE_JOIN_ROUND),
-                PropertyFactory.lineWidth(2f),
-                PropertyFactory.lineColor(Color.parseColor("#ff9900"))
-        );
+        if (!isClose) {
+            if (isIntersect) { // 不闭合，相交
+                lineLayer.setProperties(
+                        PropertyFactory.lineDasharray(new Float[]{1f, 2f}),
+                        PropertyFactory.lineCap(LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
+                        PropertyFactory.lineWidth(2f),
+                        PropertyFactory.lineColor(Color.parseColor("#f44336"))
+                );
+            } else { // 不闭合，不相交
+                lineLayer.setProperties(
+                        PropertyFactory.lineDasharray(new Float[]{1f, 2f}),
+                        PropertyFactory.lineCap(LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
+                        PropertyFactory.lineWidth(2f),
+                        PropertyFactory.lineColor(Color.parseColor("#ff9900"))
+                );
+            }
+        } else {
+            if (isIntersect) { // 闭合相交
+                lineLayer.setProperties(
+                        PropertyFactory.lineCap(LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
+                        PropertyFactory.lineWidth(2f),
+                        PropertyFactory.lineColor(Color.parseColor("#f44336"))
+                );
+            } else { // 闭合不相交
+                lineLayer.setProperties(
+                        PropertyFactory.lineCap(LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
+                        PropertyFactory.lineWidth(2f),
+                        PropertyFactory.lineColor(Color.parseColor("#ff9900"))
+                );
+            }
+        }
         landMap.addLayer(lineLayer);
     }
 
