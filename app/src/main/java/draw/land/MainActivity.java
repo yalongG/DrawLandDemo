@@ -1,11 +1,14 @@
 package draw.land;
 
+import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
+import android.view.MotionEvent;
 import android.view.View;
 
 import com.google.gson.JsonObject;
@@ -26,6 +29,7 @@ import com.mapbox.services.commons.geojson.Point;
 import com.mapbox.services.commons.models.Position;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import draw.land.util.DistanceUtil;
@@ -42,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private List<LatLng> latLngList = new ArrayList<>();
     private boolean isClose = false; // 是否闭合
     private boolean isIntersect = false; // 是否相交
+    private boolean isStartMove = false;// 是否开始移动
 
     // 点
     private final String POINT_SOURCE = "point_source_id";
@@ -56,7 +61,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private final String TEXT_LAYER = "text_layer_id";
 
     private Polygon polygon;
+    private int touchIndex = -1; // 长按时的位置
+    private int clickIndex = -1; // 点击时的位置
 
+    @SuppressLint({"ClickableViewAccessibility"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -69,13 +77,97 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     hideLog();
                     addBitmap();
                     landMap.setOnCameraChangeListener(position ->
-                            cameraPosition = position
+                            cameraPosition = position // 获取中心点
                     );
+                    landMap.addOnMapLongClickListener(point -> { // 长按
+                        if (latLngList.size() <= 0) {
+                            return;
+                        }
+
+                        touchIndex = judgeClickPosition(point);
+                        if (touchIndex != -1) {
+                            Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                            vibrator.vibrate(200);
+                            isStartMove = true;
+                            removeLayer();
+                        }
+                    });
+
+                    landMap.addOnMapClickListener(point -> {
+                        if (latLngList.size() <= 0) {
+                            return;
+                        }
+
+                        clickIndex = judgeClickPosition(point);
+                        if (clickIndex != -1) {
+                            drawLand();
+                        }
+                    });
+
+                    landView.setOnTouchListener((v, event) -> {
+                        if (isStartMove) {
+                            LatLng latLng = landMap.getProjection()
+                                    .fromScreenLocation(new PointF(event.getX(), event.getY()));
+                            switch (event.getAction()) {
+                                case MotionEvent.ACTION_MOVE:
+                                    break;
+                                case MotionEvent.ACTION_UP:
+                                    if (isClose) {
+                                        if (touchIndex == 0 || touchIndex == latLngList.size() - 1) {
+                                            latLngList.remove(latLngList.size() - 1);
+                                            latLngList.remove(0);
+                                            latLngList.add(0, latLng);
+                                            latLngList.add(latLng);
+                                        } else {
+                                            latLngList.remove(touchIndex);
+                                            latLngList.add(touchIndex, latLng);
+                                        }
+                                    } else {
+                                        latLngList.remove(touchIndex);
+                                        latLngList.add(touchIndex, latLng);
+                                    }
+                                    drawLand();
+                                    isStartMove = false;
+                                    touchIndex = -1;
+                                    break;
+                            }
+                        }
+                        return false;
+                    });
                 }
         );
 
         findViewById(R.id.btn_add).setOnClickListener(this);
         findViewById(R.id.btn_cancel).setOnClickListener(this);
+    }
+
+    /**
+     * 判断点击的位置
+     *
+     * @param point point
+     * @return position
+     */
+    public int judgeClickPosition(LatLng point) {
+        PointF pointF = landMap.getProjection().toScreenLocation(point);
+        List<PointF> pointFList = new ArrayList<>();
+        List<Float> differenceList = new ArrayList<>();
+        List<Integer> differenceNumberList = new ArrayList<>();
+        for (LatLng latLng : latLngList) {
+            pointFList.add(landMap.getProjection().toScreenLocation(latLng));
+        }
+
+        for (int i = 0, j = pointFList.size(); i < j; i++) {
+            if (Math.abs(pointFList.get(i).x - pointF.x) < 50 && Math.abs(pointFList.get(i).y - pointF.y) < 50) {
+                differenceList.add(Math.abs(pointFList.get(i).x - pointF.x) + Math.abs(pointFList.get(i).y - pointF.y));
+                differenceNumberList.add(i);
+            }
+        }
+
+        if (differenceList.size() > 0) {
+            float mix = Collections.min(differenceList);
+            return differenceNumberList.get(differenceList.indexOf(mix));
+        }
+        return -1;
     }
 
     private void addBitmap() {
@@ -84,6 +176,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             landMap.addImage("normal", normal);
             Bitmap error = BitmapFactory.decodeResource(getResources(), R.mipmap.icon_12_point_red);
             landMap.addImage("error", error);
+            Bitmap click = BitmapFactory.decodeResource(getResources(), R.mipmap.icon_20_point_orange);
+            landMap.addImage("click", click);
         }
     }
 
@@ -146,8 +240,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 addPoint();
                 break;
             case R.id.btn_cancel:
+                cancelPoint();
                 break;
         }
+    }
+
+    /**
+     * 撤销上一步操作
+     */
+    private void cancelPoint() {
+
     }
 
     /**
@@ -172,7 +274,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
         latLngList.add(latLng);
-        isIntersect = LineUtil.isLineIntersect(latLngList, isClose);
         drawLand();
     }
 
@@ -180,6 +281,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * 绘制地块
      */
     private void drawLand() {
+        isIntersect = LineUtil.isLineIntersect(latLngList, isClose);
         removeLayer();
         drawPolygon();
         drawLine();
