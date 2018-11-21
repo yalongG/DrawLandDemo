@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">DrawLandDemo</string>
+    <!--需要自己在mapbox官网申请一个key -->
+    <string name="mapbox_access_token">pk.eyJ1IjoiZ3VveWFsb25nIiwiYSI6ImNqMzQ5dDRieDAxOG4zM285dHI5enVpeXgifQ.9g39XBANJfwu1APW4ASBbA</string>
 </resources>
