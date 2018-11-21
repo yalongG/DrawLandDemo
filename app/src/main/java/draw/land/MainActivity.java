@@ -68,6 +68,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private int touchIndex = -1; // 长按时的位置
     private int clickIndex = -1; // 点击时的位置
 
+    private List<Boolean> operState = new ArrayList<>(); // 操作的状态
+    private List<LatLng> operLocation = new ArrayList<>(); // 操作的位置
+    private List<Integer> clickLocation = new ArrayList<>(); // 点击的那个点
+    private List<String> operAction = new ArrayList<>(); // 操作的行为  ADD MOVE DELETE
+
     @SuppressLint({"ClickableViewAccessibility"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,19 +123,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 case MotionEvent.ACTION_MOVE:
                                     break;
                                 case MotionEvent.ACTION_UP:
+                                    operState.add(isClose);
+                                    operAction.add("MOVE");
                                     if (isClose) {
                                         if (touchIndex == 0 || touchIndex == latLngList.size() - 1) {
+                                            operLocation.add(latLngList.get(0));
                                             latLngList.remove(latLngList.size() - 1);
                                             latLngList.remove(0);
                                             latLngList.add(0, latLng);
                                             latLngList.add(latLng);
+                                            clickLocation.add(0);
                                         } else {
+                                            operLocation.add(latLngList.get(touchIndex));
                                             latLngList.remove(touchIndex);
                                             latLngList.add(touchIndex, latLng);
+                                            clickLocation.add(touchIndex);
                                         }
                                     } else {
+                                        operLocation.add(latLngList.get(touchIndex));
                                         latLngList.remove(touchIndex);
                                         latLngList.add(touchIndex, latLng);
+                                        clickLocation.add(touchIndex);
                                     }
                                     drawLand();
                                     isStartMove = false;
@@ -153,26 +166,38 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void deletePoint() {
         new AlertDialog.Builder(this).setMessage("是否要删除这个点")
                 .setPositiveButton("确定", (dialog, which) -> {
+                    operState.add(isClose);
+                    operAction.add("DELETE");
                     if (isClose) {
                         if (latLngList.size() == 4) {
                             isClose = false;
                             if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
+                                operLocation.add(latLngList.get(0));
+                                clickLocation.add(0);
                                 latLngList.remove(latLngList.size() - 1);
                                 latLngList.remove(0);
                             } else {
+                                operLocation.add(latLngList.get(clickIndex));
+                                clickLocation.add(clickIndex);
                                 latLngList.remove(latLngList.size() - 1);
                                 latLngList.remove(clickIndex);
                             }
                         } else {
                             if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
+                                operLocation.add(latLngList.get(0));
+                                clickLocation.add(0);
                                 latLngList.remove(latLngList.size() - 1);
                                 latLngList.remove(0);
                                 latLngList.add(latLngList.get(0));
                             } else {
+                                operLocation.add(latLngList.get(clickIndex));
+                                clickLocation.add(clickIndex);
                                 latLngList.remove(clickIndex);
                             }
                         }
                     } else {
+                        operLocation.add(latLngList.get(clickIndex));
+                        clickLocation.add(clickIndex);
                         latLngList.remove(clickIndex);
                     }
                     clickIndex = -1;
@@ -293,7 +318,61 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * 撤销上一步操作
      */
     private void cancelPoint() {
-
+        if (operState.size() > 0) {
+            String action = operAction.get(operAction.size() - 1);
+            isClose = operState.get(operState.size() - 1);
+            int index = clickLocation.get(clickLocation.size() - 1);
+            LatLng latLng = operLocation.get(operLocation.size() - 1);
+            switch (action) {
+                case "ADD":
+                    latLngList.remove(latLngList.size() - 1);
+                    break;
+                case "MOVE":
+                    if (isClose) {
+                        if (index == 0) {
+                            latLngList.remove(latLngList.size() - 1);
+                            latLngList.remove(0);
+                            latLngList.add(0, latLng);
+                            latLngList.add(latLng);
+                        } else {
+                            latLngList.remove(index);
+                            latLngList.add(index, latLng);
+                        }
+                    } else {
+                        latLngList.remove(index);
+                        latLngList.add(index, latLng);
+                    }
+                    break;
+                case "DELETE":
+                    if (isClose) {
+                        if (latLngList.size() == 2) {
+                            if (index == 0) {
+                                latLngList.add(0, latLng);
+                                latLngList.add(latLng);
+                            } else {
+                                latLngList.add(index, latLng);
+                                latLngList.add(latLngList.get(0));
+                            }
+                        } else {
+                            if (index == 0) {
+                                latLngList.remove(latLngList.size() - 1);
+                                latLngList.add(0, latLng);
+                                latLngList.add(latLng);
+                            } else {
+                                latLngList.add(index, latLng);
+                            }
+                        }
+                    } else {
+                        latLngList.add(index, latLng);
+                    }
+                    break;
+            }
+            drawLand();
+            operState.remove(operState.size() - 1);
+            operLocation.remove(operLocation.size() - 1);
+            clickLocation.remove(clickLocation.size() - 1);
+            operAction.remove(operAction.size() - 1);
+        }
     }
 
     /**
@@ -306,6 +385,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LatLng latLng = new LatLng();
         latLng.setLatitude(cameraPosition.target.getLatitude());
         latLng.setLongitude(cameraPosition.target.getLongitude());
+        operState.add(isClose);
         if (latLngList.size() >= 3) {
             PointF pointF = landMap.getProjection().toScreenLocation(latLng);
             List<Feature> features = landMap.queryRenderedFeatures(pointF, POINT_LAYER);
@@ -318,6 +398,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
         latLngList.add(latLng);
+        operLocation.add(latLng);
+        clickLocation.add(latLngList.size() - 1);
+        operAction.add("ADD");
         drawLand();
     }
 
