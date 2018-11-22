@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:mapbox="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <draw.land.MirrorLandMapView
+        android:id="@+id/mirror_land_map_view"
+        android:layout_width="109dp"
+        android:layout_height="109dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="15dp"
+        android:layout_marginRight="10dp"
+        android:background="@drawable/drawable_mirror_background"
+        mapbox:mapbox_cameraTargetLat="40.7589372691904"
+        mapbox:mapbox_cameraTargetLng="120.98024123810196"
+        mapbox:mapbox_cameraZoom="10"
+        mapbox:mapbox_styleUrl="mapbox://styles/mapbox/satellite-v9" />
+
+    <draw.land.LandMapView
+        android:id="@+id/landMapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        mapbox:mapbox_cameraTargetLat="40.7589372691904"
+        mapbox:mapbox_cameraTargetLng="120.98024123810196"
+        mapbox:mapbox_cameraZoom="10"
+        mapbox:mapbox_styleUrl="mapbox://styles/mapbox/satellite-v9" />
+
+    <draw.land.MirrorLandView
+        android:id="@+id/mirror_land_view"
+        android:layout_width="109dp"
+        android:layout_height="109dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="15dp"
+        android:layout_marginRight="10dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:src="@mipmap/mapicon_dopoint" />
+
+</RelativeLayout>

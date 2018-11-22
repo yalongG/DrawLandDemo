@@ -582,6 +582,11 @@ public class LandMapView extends MapView {
         landMap.addLayer(lineLayer);
     }
 
+
+    public List<LatLng> getLatLngList() {
+        return latLngList;
+    }
+
     /**
      * 画面
      */
