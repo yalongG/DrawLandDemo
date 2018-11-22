@@ -1,4 +1,4 @@
-package draw.land;
+package draw.land.view;
 
 import android.content.Context;
 import android.graphics.PointF;
@@ -13,6 +13,8 @@ import com.mapbox.mapboxsdk.maps.MapboxMap;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import draw.land.util.MapUtil;
 
 /**
  * @author guoyalong
@@ -92,7 +94,7 @@ public class MirrorLandMapView extends MapView {
         );
     }
 
-    interface MirrorMoveDrawView {
+    public interface MirrorMoveDrawView {
         void drawView(boolean isClose, List<PointF> pointFList);
     }
 

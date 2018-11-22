@@ -1,4 +1,4 @@
-package draw.land;
+package draw.land.view;
 
 import android.content.Context;
 import android.graphics.Canvas;

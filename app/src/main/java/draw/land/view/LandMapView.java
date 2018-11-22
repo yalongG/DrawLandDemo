@@ -1,4 +1,4 @@
-package draw.land;
+package draw.land.view;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -38,9 +38,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import draw.land.R;
 import draw.land.util.DistanceUtil;
 import draw.land.util.DoubleUtil;
 import draw.land.util.LineUtil;
+import draw.land.util.MapUtil;
 
 import static android.content.Context.VIBRATOR_SERVICE;
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_CAP_ROUND;

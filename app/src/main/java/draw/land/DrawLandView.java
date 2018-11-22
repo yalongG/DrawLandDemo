@@ -12,6 +12,9 @@ import com.mapbox.mapboxsdk.camera.CameraPosition;
 import java.util.List;
 
 import draw.land.util.DensityUtil;
+import draw.land.view.LandMapView;
+import draw.land.view.MirrorLandMapView;
+import draw.land.view.MirrorLandView;
 
 public class DrawLandView extends RelativeLayout {
     private Context context;

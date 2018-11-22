@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <draw.land.MirrorLandMapView
+    <draw.land.view.MirrorLandMapView
         android:id="@+id/mirror_land_map_view"
         android:layout_width="109dp"
         android:layout_height="109dp"
@@ -17,7 +17,7 @@
         mapbox:mapbox_cameraZoom="10"
         mapbox:mapbox_styleUrl="mapbox://styles/mapbox/satellite-v9" />
 
-    <draw.land.LandMapView
+    <draw.land.view.LandMapView
         android:id="@+id/landMapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -26,7 +26,7 @@
         mapbox:mapbox_cameraZoom="10"
         mapbox:mapbox_styleUrl="mapbox://styles/mapbox/satellite-v9" />
 
-    <draw.land.MirrorLandView
+    <draw.land.view.MirrorLandView
         android:id="@+id/mirror_land_view"
         android:layout_width="109dp"
         android:layout_height="109dp"

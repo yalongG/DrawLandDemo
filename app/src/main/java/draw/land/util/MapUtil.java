@@ -1,4 +1,4 @@
-package draw.land;
+package draw.land.util;
 
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.UiSettings;
