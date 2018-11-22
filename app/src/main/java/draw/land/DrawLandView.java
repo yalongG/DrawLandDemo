@@ -65,8 +65,8 @@ public class DrawLandView extends RelativeLayout {
             }
 
             @Override
-            public void showMessage(boolean isClose, boolean mIsIntersect, String message) {
-
+            public void showMessage(boolean isClose, boolean isIntersect, String message) {
+                //TODO 做自己想做的事情
             }
         });
     }

@@ -607,7 +607,7 @@ public class LandMapView extends MapView {
 
         void dismissMirrorLand();
 
-        void showMessage(boolean isClose, boolean mIsIntersect, String message);
+        void showMessage(boolean isClose, boolean isIntersect, String message);
     }
 
     public void setOnMoveLandListener(MoveLandListener moveLandListener) {
