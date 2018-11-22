@@ -5,13 +5,18 @@
     android:layout_height="match_parent">
 
     <draw.land.LandMapView
-        android:id="@+id/landView"
+        android:id="@+id/landMapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         mapbox:mapbox_cameraTargetLat="40.7589372691904"
         mapbox:mapbox_cameraTargetLng="120.98024123810196"
         mapbox:mapbox_cameraZoom="10"
         mapbox:mapbox_styleUrl="mapbox://styles/mapbox/satellite-v9" />
+
+    <draw.land.LandView
+        android:id="@+id/landView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <LinearLayout
         android:layout_width="wrap_content"

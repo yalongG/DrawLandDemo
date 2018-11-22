@@ -44,8 +44,9 @@ import static com.mapbox.mapboxsdk.style.layers.Property.LINE_CAP_ROUND;
 import static com.mapbox.mapboxsdk.style.layers.Property.LINE_JOIN_ROUND;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-    private LandMapView landView;
+    private LandMapView landMapView;
     private MapboxMap landMap;
+    private LandView landView;
     private CameraPosition cameraPosition;
     private List<LatLng> latLngList = new ArrayList<>();
     private boolean isClose = false; // 是否闭合
@@ -73,15 +74,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private List<Integer> clickLocation = new ArrayList<>(); // 点击的那个点
     private List<String> operAction = new ArrayList<>(); // 操作的行为  ADD MOVE DELETE
 
+    private List<PointF> pointFList = new ArrayList<>();
+
     @SuppressLint({"ClickableViewAccessibility"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, getString(R.string.mapbox_access_token));
         setContentView(R.layout.activity_main);
+        landMapView = findViewById(R.id.landMapView);
+        landMapView.onCreate(savedInstanceState);
         landView = findViewById(R.id.landView);
-        landView.onCreate(savedInstanceState);
-        landView.getMapAsync(mapBoxMap -> {
+        landView.setVisibility(View.GONE);
+        landMapView.getMapAsync(mapBoxMap -> {
                     landMap = mapBoxMap;
                     hideLog();
                     addBitmap();
@@ -99,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             vibrator.vibrate(200);
                             isStartMove = true;
                             removeLayer();
+                            landView.setData(isClose, pointFList, touchIndex);
                         }
                     });
 
@@ -115,14 +121,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         }
                     });
 
-                    landView.setOnTouchListener((v, event) -> {
+                    landMapView.setOnTouchListener((v, event) -> {
                         if (isStartMove) {
                             LatLng latLng = landMap.getProjection()
                                     .fromScreenLocation(new PointF(event.getX(), event.getY()));
                             switch (event.getAction()) {
                                 case MotionEvent.ACTION_MOVE:
+                                    landView.setEvent(event);
                                     break;
                                 case MotionEvent.ACTION_UP:
+                                    landView.setEvent(event);
                                     operState.add(isClose);
                                     operAction.add("MOVE");
                                     if (isClose) {
@@ -217,8 +225,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
      * @return position
      */
     public int judgeClickPosition(LatLng point) {
+        pointFList.clear();
         PointF pointF = landMap.getProjection().toScreenLocation(point);
-        List<PointF> pointFList = new ArrayList<>();
         List<Float> differenceList = new ArrayList<>();
         List<Integer> differenceNumberList = new ArrayList<>();
         for (LatLng latLng : latLngList) {
@@ -260,43 +268,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onStart() {
         super.onStart();
-        landView.onStart();
+        landMapView.onStart();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        landView.onStop();
+        landMapView.onStop();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        landView.onDestroy();
+        landMapView.onDestroy();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        landView.onResume();
+        landMapView.onResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        landView.onPause();
+        landMapView.onPause();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        landView.onSaveInstanceState(outState);
+        landMapView.onSaveInstanceState(outState);
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        landView.onLowMemory();
+        landMapView.onLowMemory();
     }
 
     @Override
