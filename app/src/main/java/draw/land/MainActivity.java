@@ -1,80 +1,23 @@
 package draw.land;
 
 import android.annotation.SuppressLint;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
-import android.os.Vibrator;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.view.MotionEvent;
 import android.view.View;
+import android.widget.RelativeLayout;
 
-import com.google.gson.JsonObject;
 import com.mapbox.mapboxsdk.Mapbox;
-import com.mapbox.mapboxsdk.annotations.Polygon;
-import com.mapbox.mapboxsdk.annotations.PolygonOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
-import com.mapbox.mapboxsdk.geometry.LatLng;
-import com.mapbox.mapboxsdk.maps.MapboxMap;
-import com.mapbox.mapboxsdk.style.functions.Function;
-import com.mapbox.mapboxsdk.style.functions.stops.CategoricalStops;
-import com.mapbox.mapboxsdk.style.functions.stops.Stop;
-import com.mapbox.mapboxsdk.style.layers.LineLayer;
-import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
-import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
-import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
-import com.mapbox.services.commons.geojson.Feature;
-import com.mapbox.services.commons.geojson.FeatureCollection;
-import com.mapbox.services.commons.geojson.LineString;
-import com.mapbox.services.commons.geojson.Point;
-import com.mapbox.services.commons.models.Position;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import draw.land.util.DistanceUtil;
-import draw.land.util.DoubleUtil;
-import draw.land.util.LineUtil;
-
-import static com.mapbox.mapboxsdk.style.layers.Property.LINE_CAP_ROUND;
-import static com.mapbox.mapboxsdk.style.layers.Property.LINE_JOIN_ROUND;
+import draw.land.util.DensityUtil;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private LandMapView landMapView;
-    private MapboxMap landMap;
-    private LandView landView;
-    private CameraPosition cameraPosition;
-    private List<LatLng> latLngList = new ArrayList<>();
-    private boolean isClose = false; // 是否闭合
-    private boolean isIntersect = false; // 是否相交
-    private boolean isStartMove = false;// 是否开始移动
-
-    // 点
-    private final String POINT_SOURCE = "point_source_id";
-    private final String POINT_LAYER = "point_layer_id";
-
-    // 线
-    private final String LINE_SOURCE = "line_source_id";
-    private final String LINE_LAYER = "line_layer_id";
-
-    // 面
-    private final String TEXT_SOURCE = "text_source_id";
-    private final String TEXT_LAYER = "text_layer_id";
-
-    private Polygon polygon;
-    private int touchIndex = -1; // 长按时的位置
-    private int clickIndex = -1; // 点击时的位置
-
-    private List<Boolean> operState = new ArrayList<>(); // 操作的状态
-    private List<LatLng> operLocation = new ArrayList<>(); // 操作的位置
-    private List<Integer> clickLocation = new ArrayList<>(); // 点击的那个点
-    private List<String> operAction = new ArrayList<>(); // 操作的行为  ADD MOVE DELETE
-
-    private List<PointF> pointFList = new ArrayList<>();
+    private MirrorLandMapView mirrorLandMapView;
+    private MirrorLandView mirrorLandView;
 
     @SuppressLint({"ClickableViewAccessibility"})
     @Override
@@ -83,505 +26,123 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Mapbox.getInstance(this, getString(R.string.mapbox_access_token));
         setContentView(R.layout.activity_main);
         landMapView = findViewById(R.id.landMapView);
+        mirrorLandMapView = findViewById(R.id.mirror_land_map_view);
+        mirrorLandView = findViewById(R.id.mirror_land_view);
         landMapView.onCreate(savedInstanceState);
-        landView = findViewById(R.id.landView);
-        landView.setVisibility(View.GONE);
-        landMapView.getMapAsync(mapBoxMap -> {
-                    landMap = mapBoxMap;
-                    hideLog();
-                    addBitmap();
-                    landMap.setOnCameraChangeListener(position ->
-                            cameraPosition = position // 获取中心点
-                    );
-                    landMap.addOnMapLongClickListener(point -> { // 长按
-                        if (latLngList.size() <= 0) {
-                            return;
-                        }
+        mirrorLandMapView.onCreate(savedInstanceState);
 
-                        touchIndex = judgeClickPosition(point);
-                        if (touchIndex != -1) {
-                            Vibrator vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-                            vibrator.vibrate(200);
-                            isStartMove = true;
-                            removeLayer();
-                            landView.setData(isClose, pointFList, touchIndex);
-                        }
-                    });
+        removeMirror();
 
-                    landMap.addOnMapClickListener(point -> {
-                        if (latLngList.size() <= 0) {
-                            return;
-                        }
+        landMapView.setOnMoveLandListener(new LandMapView.MoveLandListener() {
+            @Override
+            public void startMove() {
 
-                        clickIndex = judgeClickPosition(point);
-                        if (clickIndex != -1) {
-                            removePoint();
-                            drawPoint();
-                            deletePoint();
-                        }
-                    });
-
-                    landMapView.setOnTouchListener((v, event) -> {
-                        if (isStartMove) {
-                            LatLng latLng = landMap.getProjection()
-                                    .fromScreenLocation(new PointF(event.getX(), event.getY()));
-                            switch (event.getAction()) {
-                                case MotionEvent.ACTION_MOVE:
-                                    landView.setEvent(event);
-                                    break;
-                                case MotionEvent.ACTION_UP:
-                                    landView.setEvent(event);
-                                    operState.add(isClose);
-                                    operAction.add("MOVE");
-                                    if (isClose) {
-                                        if (touchIndex == 0 || touchIndex == latLngList.size() - 1) {
-                                            operLocation.add(latLngList.get(0));
-                                            latLngList.remove(latLngList.size() - 1);
-                                            latLngList.remove(0);
-                                            latLngList.add(0, latLng);
-                                            latLngList.add(latLng);
-                                            clickLocation.add(0);
-                                        } else {
-                                            operLocation.add(latLngList.get(touchIndex));
-                                            latLngList.remove(touchIndex);
-                                            latLngList.add(touchIndex, latLng);
-                                            clickLocation.add(touchIndex);
-                                        }
-                                    } else {
-                                        operLocation.add(latLngList.get(touchIndex));
-                                        latLngList.remove(touchIndex);
-                                        latLngList.add(touchIndex, latLng);
-                                        clickLocation.add(touchIndex);
-                                    }
-                                    drawLand();
-                                    isStartMove = false;
-                                    touchIndex = -1;
-                                    break;
-                            }
-                        }
-                        return false;
-                    });
+                if (mirrorLandView.getVisibility() == View.GONE) {
+                    mirrorLandView.setVisibility(View.VISIBLE);
                 }
-        );
+
+                showMirror();
+            }
+
+            @Override
+            public void showMirrorLand(CameraPosition cameraPosition, PointF pointF1,
+                                       int clickPosition, boolean isClose, List<PointF> pointFList) {
+                mirrorLandMapView.setMoveDrawView((isClose1, pointFList1) -> mirrorLandView.setData(isClose1, pointFList1));
+                mirrorLandMapView.setData(cameraPosition, pointF1, clickPosition, isClose, pointFList);
+            }
+
+            @Override
+            public void dismissMirrorLand() {
+
+                if (mirrorLandView.getVisibility() == View.VISIBLE) {
+                    mirrorLandView.setVisibility(View.GONE);
+                }
+                removeMirror();
+            }
+
+            @Override
+            public void showMessage(boolean isClose, boolean mIsIntersect, String message) {
+
+            }
+        });
+
 
         findViewById(R.id.btn_add).setOnClickListener(this);
         findViewById(R.id.btn_cancel).setOnClickListener(this);
     }
 
-    /**
-     * 删除点
-     */
-    private void deletePoint() {
-        new AlertDialog.Builder(this).setMessage("是否要删除这个点")
-                .setPositiveButton("确定", (dialog, which) -> {
-                    operState.add(isClose);
-                    operAction.add("DELETE");
-                    if (isClose) {
-                        if (latLngList.size() == 4) {
-                            isClose = false;
-                            if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
-                                operLocation.add(latLngList.get(0));
-                                clickLocation.add(0);
-                                latLngList.remove(latLngList.size() - 1);
-                                latLngList.remove(0);
-                            } else {
-                                operLocation.add(latLngList.get(clickIndex));
-                                clickLocation.add(clickIndex);
-                                latLngList.remove(latLngList.size() - 1);
-                                latLngList.remove(clickIndex);
-                            }
-                        } else {
-                            if (clickIndex == 0 || clickIndex == latLngList.size() - 1) {
-                                operLocation.add(latLngList.get(0));
-                                clickLocation.add(0);
-                                latLngList.remove(latLngList.size() - 1);
-                                latLngList.remove(0);
-                                latLngList.add(latLngList.get(0));
-                            } else {
-                                operLocation.add(latLngList.get(clickIndex));
-                                clickLocation.add(clickIndex);
-                                latLngList.remove(clickIndex);
-                            }
-                        }
-                    } else {
-                        operLocation.add(latLngList.get(clickIndex));
-                        clickLocation.add(clickIndex);
-                        latLngList.remove(clickIndex);
-                    }
-                    clickIndex = -1;
-                    drawLand();
-                })
-                .setNegativeButton("取消", (dialog, which) -> {
-                    clickIndex = -1;
-                    removePoint();
-                    drawPoint();
-                }).show();
+    private void removeMirror() {
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mirrorLandMapView.getLayoutParams();
+        params.rightMargin = DensityUtil.dp2px(this, 1000);
+        params.topMargin = -DensityUtil.dp2px(this, 500);
+        mirrorLandMapView.setLayoutParams(params);
     }
 
-    /**
-     * 判断点击的位置
-     *
-     * @param point point
-     * @return position
-     */
-    public int judgeClickPosition(LatLng point) {
-        pointFList.clear();
-        PointF pointF = landMap.getProjection().toScreenLocation(point);
-        List<Float> differenceList = new ArrayList<>();
-        List<Integer> differenceNumberList = new ArrayList<>();
-        for (LatLng latLng : latLngList) {
-            pointFList.add(landMap.getProjection().toScreenLocation(latLng));
-        }
-
-        for (int i = 0, j = pointFList.size(); i < j; i++) {
-            if (Math.abs(pointFList.get(i).x - pointF.x) < 50 && Math.abs(pointFList.get(i).y - pointF.y) < 50) {
-                differenceList.add(Math.abs(pointFList.get(i).x - pointF.x) + Math.abs(pointFList.get(i).y - pointF.y));
-                differenceNumberList.add(i);
-            }
-        }
-
-        if (differenceList.size() > 0) {
-            float mix = Collections.min(differenceList);
-            return differenceNumberList.get(differenceList.indexOf(mix));
-        }
-        return -1;
+    private void showMirror() {
+        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) mirrorLandMapView.getLayoutParams();
+        params.rightMargin = DensityUtil.dp2px(this, 10);
+        params.topMargin = DensityUtil.dp2px(this, 15);
+        mirrorLandMapView.setLayoutParams(params);
     }
-
-    private void addBitmap() {
-        if (landMap != null) {
-            Bitmap normal = BitmapFactory.decodeResource(getResources(), R.mipmap.icon_12_point_orange);
-            landMap.addImage("normal", normal);
-            Bitmap error = BitmapFactory.decodeResource(getResources(), R.mipmap.icon_12_point_red);
-            landMap.addImage("error", error);
-            Bitmap click = BitmapFactory.decodeResource(getResources(), R.mipmap.icon_20_point_orange);
-            landMap.addImage("click", click);
-        }
-    }
-
-    private void hideLog() {
-        if (landMap != null) {
-            MapUtil.hideLogo(landMap);
-        }
-    }
-
 
     @Override
     protected void onStart() {
         super.onStart();
         landMapView.onStart();
+        mirrorLandMapView.onStart();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         landMapView.onStop();
+        mirrorLandMapView.onStop();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         landMapView.onDestroy();
+        mirrorLandMapView.onDestroy();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         landMapView.onResume();
+        mirrorLandMapView.onResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         landMapView.onPause();
+        mirrorLandMapView.onPause();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         landMapView.onSaveInstanceState(outState);
+        mirrorLandMapView.onSaveInstanceState(outState);
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
         landMapView.onLowMemory();
+        mirrorLandMapView.onLowMemory();
     }
 
     @Override
     public void onClick(View v) {
-        if (landMap == null) {
-            return;
-        }
         switch (v.getId()) {
             case R.id.btn_add:
-                addPoint();
+                landMapView.addPoint();
                 break;
             case R.id.btn_cancel:
-                cancelPoint();
+                landMapView.cancelPoint();
                 break;
         }
-    }
-
-    /**
-     * 撤销上一步操作
-     */
-    private void cancelPoint() {
-        if (operState.size() > 0) {
-            String action = operAction.get(operAction.size() - 1);
-            isClose = operState.get(operState.size() - 1);
-            int index = clickLocation.get(clickLocation.size() - 1);
-            LatLng latLng = operLocation.get(operLocation.size() - 1);
-            switch (action) {
-                case "ADD":
-                    latLngList.remove(latLngList.size() - 1);
-                    break;
-                case "MOVE":
-                    if (isClose) {
-                        if (index == 0) {
-                            latLngList.remove(latLngList.size() - 1);
-                            latLngList.remove(0);
-                            latLngList.add(0, latLng);
-                            latLngList.add(latLng);
-                        } else {
-                            latLngList.remove(index);
-                            latLngList.add(index, latLng);
-                        }
-                    } else {
-                        latLngList.remove(index);
-                        latLngList.add(index, latLng);
-                    }
-                    break;
-                case "DELETE":
-                    if (isClose) {
-                        if (latLngList.size() == 2) {
-                            if (index == 0) {
-                                latLngList.add(0, latLng);
-                                latLngList.add(latLng);
-                            } else {
-                                latLngList.add(index, latLng);
-                                latLngList.add(latLngList.get(0));
-                            }
-                        } else {
-                            if (index == 0) {
-                                latLngList.remove(latLngList.size() - 1);
-                                latLngList.add(0, latLng);
-                                latLngList.add(latLng);
-                            } else {
-                                latLngList.add(index, latLng);
-                            }
-                        }
-                    } else {
-                        latLngList.add(index, latLng);
-                    }
-                    break;
-            }
-            drawLand();
-            operState.remove(operState.size() - 1);
-            operLocation.remove(operLocation.size() - 1);
-            clickLocation.remove(clickLocation.size() - 1);
-            operAction.remove(operAction.size() - 1);
-        }
-    }
-
-    /**
-     * 新增点
-     */
-    private void addPoint() {
-        if (isClose) {
-            return;
-        }
-        LatLng latLng = new LatLng();
-        latLng.setLatitude(cameraPosition.target.getLatitude());
-        latLng.setLongitude(cameraPosition.target.getLongitude());
-        operState.add(isClose);
-        if (latLngList.size() >= 3) {
-            PointF pointF = landMap.getProjection().toScreenLocation(latLng);
-            List<Feature> features = landMap.queryRenderedFeatures(pointF, POINT_LAYER);
-            if (!features.isEmpty()) {
-                int position = Integer.parseInt(features.get(0).getStringProperty("position"));
-                if (position == 0) {
-                    latLng = latLngList.get(0);
-                    isClose = true;
-                }
-            }
-        }
-        latLngList.add(latLng);
-        operLocation.add(latLng);
-        clickLocation.add(latLngList.size() - 1);
-        operAction.add("ADD");
-        drawLand();
-    }
-
-    /**
-     * 绘制地块
-     */
-    private void drawLand() {
-        isIntersect = LineUtil.isLineIntersect(latLngList, isClose);
-        removeLayer();
-        drawPolygon();
-        drawLine();
-        drawText();
-        drawPoint();
-    }
-
-
-    private void drawText() {
-        if (latLngList.size() <= 1) {
-            return;
-        }
-        List<LatLng> centerLatLng = new ArrayList<>();
-        for (int i = 0, j = latLngList.size() - 1; i < j; i++) {
-            LatLng latLng = new LatLng();
-            latLng.setLatitude((latLngList.get(i).getLatitude() + latLngList.get(i + 1).getLatitude()) / 2);
-            latLng.setLongitude((latLngList.get(i).getLongitude() + latLngList.get(i + 1).getLongitude()) / 2);
-            centerLatLng.add(latLng);
-        }
-        List<Feature> featureList = new ArrayList<>();
-        List<Double> distanceList = DistanceUtil.getDistances(latLngList);
-        for (int i = 0, j = centerLatLng.size(); i < j; i++) {
-            JsonObject object = new JsonObject();
-            object.addProperty("distance", DoubleUtil.pointTwo(distanceList.get(i)));
-            featureList.add(Feature.fromGeometry(Point.fromCoordinates(Position.fromCoordinates(
-                    centerLatLng.get(i).getLongitude(), centerLatLng.get(i).getLatitude())), object));
-        }
-        GeoJsonSource textSource = new GeoJsonSource(TEXT_SOURCE, FeatureCollection.fromFeatures(featureList));
-        landMap.addSource(textSource);
-        SymbolLayer textLayer = new SymbolLayer(TEXT_LAYER, TEXT_SOURCE);
-        textLayer.setProperties(
-                PropertyFactory.textField("{distance}" + "m"),
-                PropertyFactory.textSize(12f),
-                PropertyFactory.textColor(Color.parseColor("#ffffff"))
-        );
-        landMap.addLayer(textLayer);
-    }
-
-    /**
-     * 移除所有的资源
-     */
-    private void removeLayer() {
-        removePoint();
-        landMap.removeLayer(LINE_LAYER);
-        landMap.removeSource(LINE_SOURCE);
-        landMap.removeLayer(TEXT_LAYER);
-        landMap.removeSource(TEXT_SOURCE);
-
-        if (polygon != null) {
-            landMap.removePolygon(polygon);
-        }
-    }
-
-    private void removePoint() {
-        landMap.removeLayer(POINT_LAYER);
-        landMap.removeSource(POINT_SOURCE);
-    }
-
-    /**
-     * 画点
-     */
-    private void drawPoint() {
-        List<Feature> features = new ArrayList<>();
-        for (int i = 0, j = latLngList.size(); i < j; i++) {
-            JsonObject object = new JsonObject();
-            object.addProperty("position", String.valueOf(i));
-            features.add(Feature.fromGeometry(Point.fromCoordinates(
-                    Position.fromCoordinates(latLngList.get(i).getLongitude(),
-                            latLngList.get(i).getLatitude())
-            ), object));
-        }
-        GeoJsonSource pointSource = new GeoJsonSource(POINT_SOURCE, FeatureCollection.fromFeatures(features));
-        landMap.addSource(pointSource);
-        SymbolLayer pointLayer = new SymbolLayer(POINT_LAYER, POINT_SOURCE);
-        if (isIntersect) {
-            if (clickIndex != -1) {
-                pointLayer.setProperties(
-                        PropertyFactory.iconImage(Function.property("position",
-                                CategoricalStops.categorical(
-                                        Stop.stop(String.valueOf(clickIndex),
-                                                PropertyFactory.iconImage("click"))
-                                )).withDefaultValue(PropertyFactory.iconImage("error")))
-                );
-            } else {
-                pointLayer.setProperties(
-                        PropertyFactory.iconImage("error")
-                );
-            }
-        } else {
-            if (clickIndex != -1) {
-                pointLayer.setProperties(
-                        PropertyFactory.iconImage(Function.property("position",
-                                CategoricalStops.categorical(
-                                        Stop.stop(String.valueOf(clickIndex),
-                                                PropertyFactory.iconImage("click"))
-                                )).withDefaultValue(PropertyFactory.iconImage("normal")))
-                );
-            } else {
-                pointLayer.setProperties(
-                        PropertyFactory.iconImage("normal")
-                );
-            }
-        }
-        landMap.addLayer(pointLayer);
-    }
-
-    /**
-     * 画线
-     */
-    private void drawLine() {
-        List<Position> positionList = new ArrayList<>();
-        for (int i = 0, j = latLngList.size(); i < j; i++) {
-            positionList.add(Position.fromCoordinates(latLngList.get(i).getLongitude(), latLngList.get(i).getLatitude()));
-        }
-        LineString lineString = LineString.fromCoordinates(positionList);
-        GeoJsonSource lineSource = new GeoJsonSource(LINE_SOURCE,
-                FeatureCollection.fromFeatures(new Feature[]{Feature.fromGeometry(lineString)}));
-        landMap.addSource(lineSource);
-        LineLayer lineLayer = new LineLayer(LINE_LAYER, LINE_SOURCE);
-        if (!isClose) {
-            if (isIntersect) { // 不闭合，相交
-                lineLayer.setProperties(
-                        PropertyFactory.lineDasharray(new Float[]{1f, 2f}),
-                        PropertyFactory.lineCap(LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
-                        PropertyFactory.lineWidth(2f),
-                        PropertyFactory.lineColor(Color.parseColor("#f44336"))
-                );
-            } else { // 不闭合，不相交
-                lineLayer.setProperties(
-                        PropertyFactory.lineDasharray(new Float[]{1f, 2f}),
-                        PropertyFactory.lineCap(LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
-                        PropertyFactory.lineWidth(2f),
-                        PropertyFactory.lineColor(Color.parseColor("#ff9900"))
-                );
-            }
-        } else {
-            if (isIntersect) { // 闭合相交
-                lineLayer.setProperties(
-                        PropertyFactory.lineCap(LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
-                        PropertyFactory.lineWidth(2f),
-                        PropertyFactory.lineColor(Color.parseColor("#f44336"))
-                );
-            } else { // 闭合不相交
-                lineLayer.setProperties(
-                        PropertyFactory.lineCap(LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(LINE_JOIN_ROUND),
-                        PropertyFactory.lineWidth(2f),
-                        PropertyFactory.lineColor(Color.parseColor("#ff9900"))
-                );
-            }
-        }
-        landMap.addLayer(lineLayer);
-    }
-
-    /**
-     * 画面
-     */
-    private void drawPolygon() {
-        if (!isClose) {
-            return;
-        }
-        polygon = landMap.addPolygon(new PolygonOptions().addAll(latLngList)
-                .fillColor(Color.parseColor("#212121")).alpha(0.3f));
     }
 }
